@@ -129,7 +129,7 @@ function addProgressBubble() {
   const div = document.createElement('div');
   div.className = 'msg bot';
   div.innerHTML = `<div class="avatar">AI</div><div class="bubble">
-    <p class="progress-status">Loading the AI model (first time only, ~40MB)…</p>
+    <p class="progress-status">Loading the AI model (first time only, ~175MB)…</p>
     <div class="progress-track"><div class="progress-fill" style="width:0%"></div></div>
   </div>`;
   chat.appendChild(div);
@@ -176,8 +176,8 @@ function renderReport(container, r) {
   const overallBand = band(r.overall);
   const modelPanel = r.mlAvailable ? `
     <div class="model-panel">
-      <div class="mp-title">ML model verdict <span class="model-badge">ViT deepfake detector</span></div>
-      <div>Deepfake probability: <strong>${r.mlGenerated}%</strong> (~92% reported test accuracy — not infallible, see disclaimer below)</div>
+      <div class="mp-title">ML model verdict <span class="model-badge">SwinV2 AI-image detector</span></div>
+      <div>Artificial-image probability: <strong>${r.mlGenerated}%</strong> (~98% reported validation accuracy — not infallible, see disclaimer below)</div>
       ${r.disagree ? '<div class="disagree-note">⚠ The model and the heuristic checks disagree by a wide margin — weigh this result with extra caution.</div>' : ''}
     </div>` : `
     <div class="confidence-banner low">
@@ -232,7 +232,7 @@ function renderReport(container, r) {
           <p class="ela-caption">Error-level-analysis heatmap — brighter regions indicate compression inconsistencies.</p>
         </div>
       </details>
-      <p class="disclaimer">The ML model is a real pretrained classifier (~92% reported test accuracy) — much stronger evidence than pixel heuristics alone, but still not proof. The heuristic checks are shown alongside it as an independent, fully transparent cross-check.</p>
+      <p class="disclaimer">The ML model is a real pretrained classifier (~98% reported validation accuracy) — much stronger evidence than pixel heuristics alone, but still not proof, and validation accuracy on its own test set doesn't guarantee the same accuracy on every image or every generator. The heuristic checks are shown alongside it as an independent, fully transparent cross-check.</p>
     </div>`;
 }
 
@@ -250,7 +250,7 @@ async function ensureDetector(progressBubble) {
         const fill = $('.progress-fill', progressBubble);
         const status = $('.progress-status', progressBubble);
         if (fill) fill.style.width = Math.round(info.progress) + '%';
-        if (status) status.textContent = `Loading the AI model (first time only, ~40MB)… ${Math.round(info.progress)}%`;
+        if (status) status.textContent = `Loading the AI model (first time only, ~175MB)… ${Math.round(info.progress)}%`;
       }
     });
     return classifier;
@@ -271,11 +271,7 @@ async function analyzeImage(pendingImage, progressBubble) {
     try {
       const img = new Image();
       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = pendingImage.url; });
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-      canvas.getContext('2d').drawImage(img, 0, 0);
-      const dataUrl = canvas.toDataURL('image/png');
-      ml = await runDetector(clf, dataUrl);
+      ml = await runDetector(clf, img);
     } catch (err) {
       console.error('Detector inference failed:', err);
       ml = null;
