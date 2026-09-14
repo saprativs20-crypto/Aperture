@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aperture — AI Image Forensics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round">
+        <circle cx="12" cy="12" r="9.5"></circle>
+        <path d="M12 12 12 4.6 18 8" transform="rotate(0 12 12)"></path>
+        <path d="M12 12 12 4.6 18 8" transform="rotate(60 12 12)"></path>
+        <path d="M12 12 12 4.6 18 8" transform="rotate(120 12 12)"></path>
+        <path d="M12 12 12 4.6 18 8" transform="rotate(180 12 12)"></path>
+        <path d="M12 12 12 4.6 18 8" transform="rotate(240 12 12)"></path>
+        <path d="M12 12 12 4.6 18 8" transform="rotate(300 12 12)"></path>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <span class="brand-name">Aperture</span>
+      <span class="brand-tag">AI image forensics, in-browser</span>
+    </div>
+    <div class="status-pill"><span class="status-dot"></span>local analysis</div>
+  </header>
+
+  <main class="chat" id="chat" aria-live="polite">
+    <div class="msg bot">
+      <div class="avatar">AI</div>
+      <div class="bubble">
+        <p>Drop or paste an image and send a message like <span class="cmd">Check the AI</span>. Aperture runs a real pretrained vision-transformer deepfake/AI-image classifier plus a set of transparent metadata/pixel heuristics — entirely in your browser. Nothing is uploaded anywhere. The classifier downloads once (~40MB) and is cached for next time.</p>
+      </div>
+    </div>
+  </main>
+
+  <form class="composer" id="composerForm">
+    <div class="chip-row" id="chipRow"></div>
+    <div class="composer-bar" id="composerBar">
+      <button type="button" class="icon-btn" id="attachBtn" aria-label="Attach image" title="Attach image">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5 12.4 20a5 5 0 0 1-7-7L14 4a3.5 3.5 0 0 1 5 5l-8.6 8.6a2 2 0 0 1-2.8-2.8L15 7"/></svg>
+      </button>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+      <textarea id="textInput" rows="1" placeholder='Paste an image, then try "Check the AI"…'></textarea>
+      <button type="submit" class="send-btn" id="sendBtn" disabled aria-label="Send">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </div>
+    <p class="composer-hint">Analysis runs entirely in your browser — images are never uploaded. Results are an estimate, not proof.</p>
+  </form>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
