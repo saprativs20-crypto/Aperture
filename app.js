@@ -182,7 +182,7 @@ function renderReport(container, r) {
     </div>` : `
     <div class="confidence-banner low">
       <span class="cb-label">ML MODEL UNAVAILABLE</span>
-      <span>Couldn't load the AI classifier (offline, or the download failed). Falling back to the heuristic-only estimate below — treat it as a rough lean, not a verdict.</span>
+      <span>${r.mlError ? escapeHtml(r.mlError) : 'Couldn\'t load the AI classifier (offline, or the download failed).'} Falling back to the heuristic-only estimate below — treat it as a rough lean, not a verdict. Sending another message will retry the download.</span>
     </div>`;
 
   container.innerHTML = `
@@ -238,25 +238,32 @@ function renderReport(container, r) {
 
 // ---- Model loading (lazy, on first analysis) ----
 let classifier = null;
-let modelLoadFailed = false;
+let modelLoadError = null;
 
+// Note: a failed load is intentionally NOT a permanent latch. Each
+// loadDetector() call already retries several times internally
+// (detector.js's fetchWithProgress), but if the whole attempt still fails
+// (e.g. a real network drop), the user can trigger a fresh attempt simply
+// by sending another image - a transient failure shouldn't lock out the ML
+// model for the rest of the session.
 async function ensureDetector(progressBubble) {
   if (classifier) return classifier;
-  if (modelLoadFailed) return null;
   try {
     classifier = await loadDetector((info) => {
       if (!progressBubble) return;
+      const fill = $('.progress-fill', progressBubble);
+      const status = $('.progress-status', progressBubble);
       if (info.status === 'progress' && typeof info.progress === 'number') {
-        const fill = $('.progress-fill', progressBubble);
-        const status = $('.progress-status', progressBubble);
         if (fill) fill.style.width = Math.round(info.progress) + '%';
         if (status) status.textContent = `Loading the AI model (first time only, ~175MB)… ${Math.round(info.progress)}%`;
+      } else if (info.status === 'retrying') {
+        if (status) status.textContent = `Connection interrupted — retrying download (attempt ${info.attempt})… ${Math.round(info.progress)}%`;
       }
     });
     return classifier;
   } catch (err) {
     console.error('Detector load failed:', err);
-    modelLoadFailed = true;
+    modelLoadError = err.message || 'Unknown error';
     return null;
   }
 }
@@ -287,6 +294,7 @@ async function analyzeImage(pendingImage, progressBubble) {
     elapsed,
     headline: verdictHeadline(combined.overall, combined.mlAvailable, combined.disagree),
     heuristic,
+    mlError: modelLoadError,
     ...combined
   };
 }
@@ -311,7 +319,10 @@ composerForm.addEventListener('submit', async (e) => {
   textInput.value = ''; textInput.style.height = 'auto';
   pending = null; renderChip(); updateSendState();
 
-  const needsModelLoad = !isLoaded() && !modelLoadFailed;
+  // isLoaded() reflects whether a model attempt is currently in-flight or
+  // has completed; detector.js resets it to "not loaded" internally when an
+  // attempt fails, so this naturally shows the progress bar again on retry.
+  const needsModelLoad = !isLoaded();
   const progressBubble = needsModelLoad ? addProgressBubble() : addTyping();
 
   let report;

@@ -52,24 +52,60 @@ export function isLoaded() {
   return sessionPromise !== null;
 }
 
-async function fetchWithProgress(url, onProgress) {
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Model download failed: HTTP ${resp.status}`);
-  const total = Number(resp.headers.get('content-length')) || 0;
-  const reader = resp.body.getReader();
-  const chunks = [];
+// A ~175MB download over a real-world connection can and does get
+// interrupted mid-transfer (net::ERR_CONNECTION_RESET is common on
+// slower/unstable wifi, some corporate networks, or antivirus products that
+// intercept large downloads) - confirmed by real user testing, not
+// hypothetical. This retries with an HTTP Range request to resume from
+// where it left off rather than re-downloading from scratch each time, and
+// falls back to a clean restart if the server doesn't honor the Range
+// request (still 200 instead of 206).
+async function fetchWithProgress(url, onProgress, maxRetries = 4) {
   let received = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    chunks.push(value);
-    received += value.length;
-    if (onProgress) onProgress({ status: 'progress', progress: total ? (received / total) * 100 : 0 });
+  let total = 0;
+  let chunks = [];
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const headers = received > 0 ? { Range: `bytes=${received}-` } : {};
+      const resp = await fetch(url, { headers });
+      if (!resp.ok && resp.status !== 206) throw new Error(`HTTP ${resp.status}`);
+
+      if (received > 0 && resp.status !== 206) {
+        // Server ignored the Range request (sent the full file back at 200) -
+        // restart this attempt cleanly instead of corrupting the buffer.
+        received = 0;
+        chunks = [];
+      }
+
+      if (!total) {
+        const contentRange = resp.headers.get('content-range');
+        const m = contentRange && /\/(\d+)$/.exec(contentRange);
+        total = m ? Number(m[1]) : (Number(resp.headers.get('content-length')) || 0);
+      }
+
+      const reader = resp.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.length;
+        if (onProgress) onProgress({ status: 'progress', progress: total ? (received / total) * 100 : 0 });
+      }
+      const buf = new Uint8Array(received);
+      let offset = 0;
+      for (const chunk of chunks) { buf.set(chunk, offset); offset += chunk.length; }
+      return buf.buffer;
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxRetries) {
+        if (onProgress) onProgress({ status: 'retrying', attempt: attempt + 1, progress: total ? (received / total) * 100 : 0 });
+        await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+      }
+    }
   }
-  const buf = new Uint8Array(received);
-  let offset = 0;
-  for (const chunk of chunks) { buf.set(chunk, offset); offset += chunk.length; }
-  return buf.buffer;
+  throw new Error(`Couldn't finish downloading the AI model after ${maxRetries + 1} attempts (${lastError?.message || 'network error'}). This usually means an unstable connection or a firewall/antivirus interrupting large downloads.`);
 }
 
 export function loadDetector(onProgress) {
