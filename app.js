@@ -338,3 +338,15 @@ updateSendState();
 // Warm up the model in the background shortly after load, so the first
 // real analysis doesn't have to wait for the full download.
 setTimeout(() => { ensureDetector(null); }, 1500);
+
+// Registers the service worker that makes the app installable ("Add to
+// Home Screen") and caches the app shell for offline use. Requires a
+// secure context (https://, or localhost for local testing) - browsers
+// refuse to register service workers on plain http:// or file://.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.warn('Service worker registration failed (expected on non-HTTPS hosts):', err);
+    });
+  });
+}
